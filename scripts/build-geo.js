@@ -38,10 +38,60 @@ const isDirectMmdb = url.endsWith('.mmdb');
 
 // Download handler for compressed tar.gz files
 const downloadCompressed = url =>
-  new Promise(resolve => {
-    https.get(url, res => {
-      resolve(res.pipe(zlib.createGunzip({})).pipe(tar.t()));
-    });
+  new Promise((resolve, reject) => {
+    https
+      .get(url, res => {
+        const extract = tar.t();
+        let pendingWrites = 0;
+        let archiveFinished = false;
+
+        const finishIfReady = () => {
+          if (archiveFinished && pendingWrites === 0) {
+            resolve();
+          }
+        };
+
+        extract.on('entry', entry => {
+          if (entry.path.endsWith('.mmdb')) {
+            pendingWrites += 1;
+
+            const filename = path.join(dest, path.basename(entry.path));
+            const fileStream = fs.createWriteStream(filename);
+
+            entry.pipe(fileStream);
+
+            fileStream.on('finish', () => {
+              console.log('Saved geo database:', filename);
+              pendingWrites -= 1;
+              finishIfReady();
+            });
+
+            fileStream.on('error', e => {
+              reject(e);
+            });
+
+            return;
+          }
+
+          entry.resume();
+        });
+
+        extract.on('finish', () => {
+          archiveFinished = true;
+          finishIfReady();
+        });
+
+        extract.on('error', e => {
+          reject(e);
+        });
+
+        res.on('error', e => {
+          reject(e);
+        });
+
+        res.pipe(zlib.createGunzip({})).pipe(extract);
+      })
+      .on('error', reject);
   });
 
 // Download handler for direct .mmdb files
@@ -75,32 +125,19 @@ const downloadDirect = (url, originalUrl) =>
 
 // Execute download based on file type
 if (isDirectMmdb) {
-  downloadDirect(url).catch(e => {
-    console.error('Failed to download geo database:', e);
-    process.exit(1);
-  });
+  downloadDirect(url)
+    .then(() => {
+      process.exit(0);
+    })
+    .catch(e => {
+      console.error('Failed to download geo database:', e);
+      process.exit(1);
+    });
 } else {
   downloadCompressed(url)
-    .then(
-      res =>
-        new Promise((resolve, reject) => {
-          res.on('entry', entry => {
-            if (entry.path.endsWith('.mmdb')) {
-              const filename = path.join(dest, path.basename(entry.path));
-              entry.pipe(fs.createWriteStream(filename));
-
-              console.log('Saved geo database:', filename);
-            }
-          });
-
-          res.on('error', e => {
-            reject(e);
-          });
-          res.on('finish', () => {
-            resolve();
-          });
-        }),
-    )
+    .then(() => {
+      process.exit(0);
+    })
     .catch(e => {
       console.error('Failed to download geo database:', e);
       process.exit(1);
