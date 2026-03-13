@@ -16,12 +16,14 @@ test('Dockerfile.acree uses China-friendly image and package mirror args', () =>
   expect(dockerfile).toContain(
     'ARG CHINA_GEO_DATABASE_URL="https://raw.githubusercontent.com/GitSquared/node-geolite2-redist/master/redist/GeoLite2-City.tar.gz"',
   );
+  expect(dockerfile).toContain('ARG CHINA_GEO_DATABASE_URL_B64=""');
 
   expect(dockerfile).toContain('FROM ${CHINA_NODE_IMAGE} AS deps');
   expect(dockerfile).toContain('FROM ${CHINA_NODE_IMAGE} AS builder');
   expect(dockerfile).toContain('FROM ${CHINA_NODE_IMAGE} AS runner');
 
   expect(dockerfile).toContain('ENV GEO_DATABASE_URL=$CHINA_GEO_DATABASE_URL');
+  expect(dockerfile).toContain(`printf '%s' "$CHINA_GEO_DATABASE_URL_B64" | base64 -d`);
   expect(dockerfile).toContain('COREPACK_NPM_REGISTRY');
   expect(dockerfile).not.toContain('npm install -g pnpm');
 });

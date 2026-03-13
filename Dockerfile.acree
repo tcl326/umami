@@ -2,6 +2,7 @@ ARG CHINA_NODE_IMAGE="m.daocloud.io/docker.io/library/node:22-alpine"
 ARG CHINA_NPM_REGISTRY="https://mirrors.cloud.tencent.com/npm/"
 ARG CHINA_ALPINE_MIRROR="https://mirrors.aliyun.com/alpine"
 ARG CHINA_GEO_DATABASE_URL="https://raw.githubusercontent.com/GitSquared/node-geolite2-redist/master/redist/GeoLite2-City.tar.gz"
+ARG CHINA_GEO_DATABASE_URL_B64=""
 
 # Install dependencies only when needed
 FROM ${CHINA_NODE_IMAGE} AS deps
@@ -26,13 +27,17 @@ COPY docker/middleware.ts ./src
 
 ARG BASE_PATH=/analytics
 ARG CHINA_GEO_DATABASE_URL="https://raw.githubusercontent.com/GitSquared/node-geolite2-redist/master/redist/GeoLite2-City.tar.gz"
+ARG CHINA_GEO_DATABASE_URL_B64=""
 
 ENV BASE_PATH=$BASE_PATH
 ENV GEO_DATABASE_URL=$CHINA_GEO_DATABASE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/dummy"
 
-RUN npm run build-docker
+RUN if [ -n "$CHINA_GEO_DATABASE_URL_B64" ]; then \
+      export GEO_DATABASE_URL="$(printf '%s' "$CHINA_GEO_DATABASE_URL_B64" | base64 -d)"; \
+    fi \
+    && npm run build-docker
 
 # Production image, copy all the files and run next
 FROM ${CHINA_NODE_IMAGE} AS runner
