@@ -34,3 +34,12 @@ test.each(['Dockerfile', 'Dockerfile.acree'])('%s makes runtime paths writable',
   expect(dockerfile).toContain('mkdir -p /home/nextjs/.cache');
   expect(dockerfile).toContain('chown -R nextjs:nodejs /app /home/nextjs');
 });
+
+test.each([
+  'Dockerfile',
+  'Dockerfile.acree',
+])('%s allows Prisma runner dependency build scripts', filename => {
+  const dockerfile = readDockerfile(filename);
+
+  expect(dockerfile).toContain("--allow-build=prisma --allow-build='@prisma/engines'");
+});
