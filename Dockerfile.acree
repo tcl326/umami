@@ -1,11 +1,13 @@
 ARG CHINA_NODE_IMAGE="m.daocloud.io/docker.io/library/node:22-alpine"
 ARG CHINA_NPM_REGISTRY="https://mirrors.cloud.tencent.com/npm/"
+ARG PNPM_VERSION="10.0.0"
 ARG CHINA_ALPINE_MIRROR="https://mirrors.aliyun.com/alpine"
 ARG CHINA_GEO_DATABASE_URL="https://raw.githubusercontent.com/GitSquared/node-geolite2-redist/master/redist/GeoLite2-City.tar.gz"
 ARG CHINA_GEO_DATABASE_URL_B64=""
 
 # Install dependencies only when needed
 FROM ${CHINA_NODE_IMAGE} AS deps
+ARG PNPM_VERSION
 ARG CHINA_NPM_REGISTRY="https://mirrors.cloud.tencent.com/npm/"
 ARG CHINA_ALPINE_MIRROR="https://mirrors.aliyun.com/alpine"
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
@@ -15,7 +17,14 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN export COREPACK_NPM_REGISTRY="${CHINA_NPM_REGISTRY}" \
     && corepack enable \
+    && corepack prepare pnpm@${PNPM_VERSION} --activate \
     && pnpm config set registry "${CHINA_NPM_REGISTRY}" \
+    && pnpm config set fetch-retries 10 \
+    && pnpm config set fetch-retry-mintimeout 20000 \
+    && pnpm config set fetch-retry-maxtimeout 120000 \
+    && pnpm config set fetch-timeout 120000 \
+    && pnpm config set network-concurrency 1 \
+    && pnpm config set child-concurrency 1 \
     && pnpm install --frozen-lockfile
 
 # Rebuild the source code only when needed
@@ -43,6 +52,7 @@ RUN if [ -n "$CHINA_GEO_DATABASE_URL_B64" ]; then \
 FROM ${CHINA_NODE_IMAGE} AS runner
 WORKDIR /app
 
+ARG PNPM_VERSION
 ARG PRISMA_VERSION="6.19.0"
 ARG NODE_OPTIONS
 ARG CHINA_NPM_REGISTRY="https://mirrors.cloud.tencent.com/npm/"
@@ -62,7 +72,11 @@ RUN set -x \
     && pnpm config set registry "${CHINA_NPM_REGISTRY}"
 
 # Script dependencies
-RUN pnpm --allow-build=prisma --allow-build='@prisma/engines' add npm-run-all dotenv chalk semver \
+RUN export NODE_OPTIONS="--max-old-space-size=768" \
+    && corepack prepare pnpm@${PNPM_VERSION} --activate \
+    && pnpm config set network-concurrency 1 \
+    && pnpm config set child-concurrency 1 \
+    && pnpm --allow-build=prisma --allow-build='@prisma/engines' add npm-run-all dotenv chalk semver \
     prisma@${PRISMA_VERSION} \
     @prisma/adapter-pg@${PRISMA_VERSION}
 

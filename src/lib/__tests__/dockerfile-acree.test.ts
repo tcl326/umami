@@ -12,6 +12,7 @@ test('Dockerfile.acree uses China-friendly image and package mirror args', () =>
     'ARG CHINA_NODE_IMAGE="m.daocloud.io/docker.io/library/node:22-alpine"',
   );
   expect(dockerfile).toContain('ARG CHINA_NPM_REGISTRY="https://mirrors.cloud.tencent.com/npm/"');
+  expect(dockerfile).toContain('ARG PNPM_VERSION="10.0.0"');
   expect(dockerfile).toContain('ARG CHINA_ALPINE_MIRROR="https://mirrors.aliyun.com/alpine"');
   expect(dockerfile).toContain(
     'ARG CHINA_GEO_DATABASE_URL="https://raw.githubusercontent.com/GitSquared/node-geolite2-redist/master/redist/GeoLite2-City.tar.gz"',
@@ -26,6 +27,12 @@ test('Dockerfile.acree uses China-friendly image and package mirror args', () =>
   expect(dockerfile).toContain(`printf '%s' "$CHINA_GEO_DATABASE_URL_B64" | base64 -d`);
   expect(dockerfile).toContain('COREPACK_NPM_REGISTRY');
   expect(dockerfile).not.toContain('npm install -g pnpm');
+  expect(dockerfile).toContain('corepack prepare pnpm@${PNPM_VERSION} --activate');
+  expect(dockerfile).toContain('pnpm config set fetch-retries');
+  expect(dockerfile).toContain('pnpm config set fetch-timeout');
+  expect(dockerfile).toContain('pnpm config set child-concurrency 1');
+  expect(dockerfile).toContain('pnpm config set network-concurrency 1');
+  expect(dockerfile).toContain('NODE_OPTIONS="--max-old-space-size=768"');
 });
 
 test.each(['Dockerfile', 'Dockerfile.acree'])('%s makes runtime paths writable', filename => {
