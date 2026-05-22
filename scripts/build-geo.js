@@ -33,14 +33,27 @@ if (!fs.existsSync(dest)) {
   fs.mkdirSync(dest);
 }
 
-// Check if URL points to a direct .mmdb file (already extracted)
+// Avoid redownloading large geo assets on every build.
+const defaultFilename = path.join(dest, `${db}.mmdb`);
+if (fs.existsSync(defaultFilename)) {
+  console.log('Geo database already present:', defaultFilename);
+  process.exit(0);
+}
+
 const isDirectMmdb = url.endsWith('.mmdb');
+const isGzippedMmdb = url.endsWith('.mmdb.gz');
 
 // Download handler for compressed tar.gz files
 const downloadCompressed = url =>
   new Promise((resolve, reject) => {
     https
       .get(url, res => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`HTTP ${res.statusCode} downloading geo archive`));
+          res.resume();
+          return;
+        }
+
         const extract = tar.t();
         let pendingWrites = 0;
         let archiveFinished = false;
@@ -94,6 +107,39 @@ const downloadCompressed = url =>
       .on('error', reject);
   });
 
+// Download handler for gzipped .mmdb files (.mmdb.gz).
+const downloadGzippedMmdb = url =>
+  new Promise((resolve, reject) => {
+    https
+      .get(url, res => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`HTTP ${res.statusCode} downloading geo database`));
+          res.resume();
+          return;
+        }
+
+        // Always consume the full response and surface stream errors.
+        // Otherwise the build can hang indefinitely if gunzip or the network
+        // stream errors before the destination file stream finishes.
+        res.on('error', reject);
+
+        const filename = path.join(dest, `${db}.mmdb`);
+        const fileStream = fs.createWriteStream(filename);
+
+        const gunzip = zlib.createGunzip({});
+        gunzip.on('error', reject);
+        fileStream.on('error', reject);
+
+        fileStream.on('finish', () => {
+          console.log('Saved geo database:', filename);
+          resolve();
+        });
+
+        res.pipe(gunzip).pipe(fileStream);
+      })
+      .on('error', reject);
+  });
+
 // Download handler for direct .mmdb files
 const downloadDirect = (url, originalUrl) =>
   new Promise((resolve, reject) => {
@@ -124,7 +170,16 @@ const downloadDirect = (url, originalUrl) =>
   });
 
 // Execute download based on file type
-if (isDirectMmdb) {
+if (isGzippedMmdb) {
+  downloadGzippedMmdb(url)
+    .then(() => {
+      process.exit(0);
+    })
+    .catch(e => {
+      console.error('Failed to download geo database:', e);
+      process.exit(1);
+    });
+} else if (isDirectMmdb) {
   downloadDirect(url)
     .then(() => {
       process.exit(0);

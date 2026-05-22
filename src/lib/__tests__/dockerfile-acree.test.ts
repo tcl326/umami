@@ -15,7 +15,7 @@ test('Dockerfile.acree uses China-friendly image and package mirror args', () =>
   expect(dockerfile).toContain('ARG PNPM_VERSION="10.0.0"');
   expect(dockerfile).toContain('ARG CHINA_ALPINE_MIRROR="https://mirrors.aliyun.com/alpine"');
   expect(dockerfile).toContain(
-    'ARG CHINA_GEO_DATABASE_URL="https://raw.githubusercontent.com/GitSquared/node-geolite2-redist/master/redist/GeoLite2-City.tar.gz"',
+    'ARG CHINA_GEO_DATABASE_URL="https://cdn.jsdelivr.net/npm/geolite2-city/GeoLite2-City.mmdb.gz"',
   );
   expect(dockerfile).toContain('ARG CHINA_GEO_DATABASE_URL_B64=""');
 

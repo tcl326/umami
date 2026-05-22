@@ -165,6 +165,14 @@ if (cloudMode) {
 /** @type {import('next').NextConfig} */
 export default {
   reactStrictMode: false,
+  experimental: {
+    // Keep build-time concurrency conservative for our 2 vCPU / ~2GB CI builders.
+    staticGenerationMaxConcurrency: 1,
+    // Reduce peak memory usage during webpack compilation.
+    // https://nextjs.org/docs/app/guides/memory-usage
+    webpackBuildWorker: false,
+    webpackMemoryOptimizations: true,
+  },
   env: {
     basePath,
     cloudMode,

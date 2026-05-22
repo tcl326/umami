@@ -4,6 +4,12 @@ Dockerfile
 .gitignore
 .DS_Store
 node_modules
+.next
+build
+geo
+generated
+src/generated
+public/script.js
 .idea
 .env
 .env.*
