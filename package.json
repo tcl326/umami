@@ -10,6 +10,13 @@
     "url": "https://github.com/umami-software/umami.git"
   },
   "type": "module",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma"
+    ]
+  },
   "scripts": {
     "dev": "next dev -p 3001 --turbo",
     "build": "npm-run-all check-env build-db check-db build-tracker build-geo build-app",

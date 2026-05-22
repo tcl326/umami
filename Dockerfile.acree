@@ -76,7 +76,7 @@ RUN export NODE_OPTIONS="--max-old-space-size=768" \
     && corepack prepare pnpm@${PNPM_VERSION} --activate \
     && pnpm config set network-concurrency 1 \
     && pnpm config set child-concurrency 1 \
-    && pnpm --allow-build=prisma --allow-build='@prisma/engines' add npm-run-all dotenv chalk semver \
+    && pnpm add npm-run-all dotenv chalk semver \
     prisma@${PRISMA_VERSION} \
     @prisma/adapter-pg@${PRISMA_VERSION}
 

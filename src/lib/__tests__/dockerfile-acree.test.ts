@@ -48,5 +48,11 @@ test.each([
 ])('%s allows Prisma runner dependency build scripts', filename => {
   const dockerfile = readDockerfile(filename);
 
-  expect(dockerfile).toContain("--allow-build=prisma --allow-build='@prisma/engines'");
+  // Dockerfile uses pnpm's --allow-build; Dockerfile.acree pins pnpm@10 which doesn't support that flag.
+  // For Dockerfile.acree we rely on package.json's pnpm.onlyBuiltDependencies to allow Prisma scripts.
+  if (filename === 'Dockerfile') {
+    expect(dockerfile).toContain("--allow-build=prisma --allow-build='@prisma/engines'");
+  } else {
+    expect(dockerfile).not.toContain('--allow-build');
+  }
 });
