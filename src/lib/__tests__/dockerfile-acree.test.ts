@@ -32,7 +32,9 @@ test('Dockerfile.acree uses China-friendly image and package mirror args', () =>
   expect(dockerfile).toContain('pnpm config set fetch-timeout');
   expect(dockerfile).toContain('pnpm config set child-concurrency 1');
   expect(dockerfile).toContain('pnpm config set network-concurrency 1');
-  expect(dockerfile).toContain('NODE_OPTIONS="--max-old-space-size=768"');
+  // The runner stage must not do any network-bound package adds/installs.
+  // We keep all dependency resolution in the deps stage for deterministic CI builds.
+  expect(dockerfile).not.toContain('pnpm add');
 });
 
 test.each(['Dockerfile', 'Dockerfile.acree'])('%s makes runtime paths writable', filename => {
