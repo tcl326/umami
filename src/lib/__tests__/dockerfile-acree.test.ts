@@ -35,6 +35,7 @@ test('Dockerfile.acree uses China-friendly image and package mirror args', () =>
   // The runner stage must not do any network-bound package adds/installs.
   // We keep all dependency resolution in the deps stage for deterministic CI builds.
   expect(dockerfile).not.toContain('pnpm add');
+  expect(dockerfile).toContain('CMD ["npm", "run", "start-docker"]');
 });
 
 test.each(['Dockerfile', 'Dockerfile.acree'])('%s makes runtime paths writable', filename => {

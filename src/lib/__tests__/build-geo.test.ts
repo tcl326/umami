@@ -8,7 +8,7 @@ function readBuildGeoScript() {
 test('Geo build script handles gzipped mmdb downloads and cached assets', () => {
   const buildGeo = readBuildGeoScript();
 
-  expect(buildGeo).toContain("url.endsWith('.mmdb.gz')");
+  expect(buildGeo).toContain("endsWith('.mmdb.gz')");
   expect(buildGeo).toContain('Geo database already present:');
   expect(buildGeo).toContain('downloadGzippedMmdb');
   expect(buildGeo).toContain('res.pipe(gunzip).pipe(fileStream)');
