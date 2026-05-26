@@ -44,7 +44,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/dummy"
 
 RUN if [ -n "$CHINA_GEO_DATABASE_URL_B64" ]; then \
-      export GEO_DATABASE_URL="$(printf '%s' "$CHINA_GEO_DATABASE_URL_B64" | base64 -d)"; \
+      # Some build systems accept build args as KEY=VALUE pairs and may reject values
+      # that contain '=' (base64 padding). Accept base64 *and* base64url input with or
+      # without padding, and decode via Node to avoid BusyBox base64 strictness.
+      export GEO_DATABASE_URL="$(node -e "const raw=process.env.CHINA_GEO_DATABASE_URL_B64||'';const s=raw.trim();if(!s){process.exit(0);}const norm=s.replace(/-/g,'+').replace(/_/g,'/');const pad='='.repeat((4-(norm.length%4))%4);process.stdout.write(Buffer.from(norm+pad,'base64').toString('utf8'))")"; \
     fi \
     && export NODE_OPTIONS="--max-old-space-size=1536" \
     && npm run build-docker

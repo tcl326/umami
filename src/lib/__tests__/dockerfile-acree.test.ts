@@ -24,7 +24,10 @@ test('Dockerfile.acree uses China-friendly image and package mirror args', () =>
   expect(dockerfile).toContain('FROM ${CHINA_NODE_IMAGE} AS runner');
 
   expect(dockerfile).toContain('ENV GEO_DATABASE_URL=$CHINA_GEO_DATABASE_URL');
-  expect(dockerfile).toContain(`printf '%s' "$CHINA_GEO_DATABASE_URL_B64" | base64 -d`);
+  // We decode CHINA_GEO_DATABASE_URL_B64 via Node so the build arg can be base64url and/or unpadded
+  // (some build UIs reject '=' padding in KEY=VALUE style parameters).
+  expect(dockerfile).toContain('process.env.CHINA_GEO_DATABASE_URL_B64');
+  expect(dockerfile).toContain("Buffer.from(norm+pad,'base64')");
   expect(dockerfile).toContain('COREPACK_NPM_REGISTRY');
   expect(dockerfile).not.toContain('npm install -g pnpm');
   expect(dockerfile).toContain('corepack prepare pnpm@${PNPM_VERSION} --activate');
