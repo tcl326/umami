@@ -1,0 +1,101 @@
+ARG CHINA_NODE_IMAGE="m.daocloud.io/docker.io/library/node:22-alpine"
+ARG CHINA_NPM_REGISTRY="https://mirrors.cloud.tencent.com/npm/"
+ARG PNPM_VERSION="11.21.0"
+ARG CHINA_ALPINE_MIRROR="https://mirrors.aliyun.com/alpine"
+ARG CHINA_GEO_DATABASE_URL="https://cdn.jsdelivr.net/npm/geolite2-city/GeoLite2-City.mmdb.gz"
+ARG CHINA_GEO_DATABASE_URL_B64=""
+
+# Install dependencies only when needed
+FROM ${CHINA_NODE_IMAGE} AS deps
+ARG PNPM_VERSION
+ARG CHINA_NPM_REGISTRY="https://mirrors.cloud.tencent.com/npm/"
+ARG CHINA_ALPINE_MIRROR="https://mirrors.aliyun.com/alpine"
+# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+RUN sed -i "s|https://dl-cdn.alpinelinux.org/alpine|${CHINA_ALPINE_MIRROR}|g" /etc/apk/repositories \
+    && apk add --no-cache libc6-compat
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN npm install -g pnpm@${PNPM_VERSION} --registry="${CHINA_NPM_REGISTRY}" \
+    && pnpm config set registry "${CHINA_NPM_REGISTRY}" \
+    && pnpm config set fetch-retries 10 \
+    && pnpm config set fetch-retry-mintimeout 20000 \
+    && pnpm config set fetch-retry-maxtimeout 120000 \
+    && pnpm config set fetch-timeout 120000 \
+    && pnpm config set network-concurrency 1 \
+    && pnpm config set child-concurrency 1 \
+    && pnpm install --frozen-lockfile
+
+# Rebuild the source code only when needed
+FROM ${CHINA_NODE_IMAGE} AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+COPY docker/proxy.ts ./src
+
+ARG BASE_PATH=/analytics
+ARG CHINA_GEO_DATABASE_URL="https://cdn.jsdelivr.net/npm/geolite2-city/GeoLite2-City.mmdb.gz"
+ARG CHINA_GEO_DATABASE_URL_B64=""
+
+ENV BASE_PATH=$BASE_PATH
+ENV GEO_DATABASE_URL=$CHINA_GEO_DATABASE_URL
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV DATABASE_URL="postgresql://user:pass@localhost:5432/dummy"
+
+RUN if [ -n "$CHINA_GEO_DATABASE_URL_B64" ]; then \
+      # Some build systems accept build args as KEY=VALUE pairs and may reject values
+      # that contain '=' (base64 padding). Accept base64 *and* base64url input with or
+      # without padding, and decode via Node to avoid BusyBox base64 strictness.
+      export GEO_DATABASE_URL="$(node -e "const raw=process.env.CHINA_GEO_DATABASE_URL_B64||'';const s=raw.trim();if(!s){process.exit(0);}const norm=s.replace(/-/g,'+').replace(/_/g,'/');const pad='='.repeat((4-(norm.length%4))%4);process.stdout.write(Buffer.from(norm+pad,'base64').toString('utf8'))")"; \
+    fi \
+    && export NODE_OPTIONS="--max-old-space-size=1536" \
+    && npm run build-docker
+
+# Production image, copy all the files and run next
+FROM ${CHINA_NODE_IMAGE} AS runner
+WORKDIR /app
+
+ARG PNPM_VERSION
+ARG NODE_OPTIONS
+ARG CHINA_NPM_REGISTRY="https://mirrors.cloud.tencent.com/npm/"
+ARG CHINA_ALPINE_MIRROR="https://mirrors.aliyun.com/alpine"
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS=$NODE_OPTIONS
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+RUN set -x \
+    && sed -i "s|https://dl-cdn.alpinelinux.org/alpine|${CHINA_ALPINE_MIRROR}|g" /etc/apk/repositories \
+    && apk add --no-cache curl libc6-compat \
+    && npm install -g pnpm@${PNPM_VERSION} --registry="${CHINA_NPM_REGISTRY}" \
+    && pnpm config set registry "${CHINA_NPM_REGISTRY}" \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/generated ./generated
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy production deps. We intentionally avoid mutating/adding dependencies in the
+# runner stage to keep BuildKit builds deterministic and avoid long network-bound steps.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=deps --chown=nextjs:nodejs /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=deps --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+
+RUN mkdir -p /home/nextjs/.cache \
+    && chown -R nextjs:nodejs /app /home/nextjs
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
+
+CMD ["sh", "scripts/start-docker.sh"]

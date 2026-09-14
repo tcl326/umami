@@ -11,24 +11,36 @@ import {
   Text,
 } from '@umami/react-zen';
 import { type ReactNode, useState } from 'react';
+import { ControlledDialog } from '@/components/common/ControlledDialog';
 import { useMessages } from '@/components/hooks';
 import { useDeleteQuery } from '@/components/hooks/queries/useDeleteQuery';
 import { Edit, MoreHorizontal, Trash } from '@/components/icons';
+import { DialogButton } from './DialogButton';
 
 export function ReportEditButton({
   id,
   name,
   type,
+  title,
+  width,
+  height,
+  minWidth,
+  minHeight,
   children,
   onDelete,
 }: {
   id: string;
   name: string;
   type: string;
+  title?: ReactNode;
+  width?: string;
+  height?: string;
+  minWidth?: string;
+  minHeight?: string;
   onDelete?: () => void;
   children: ({ close }: { close: () => void }) => ReactNode;
 }) {
-  const { formatMessage, labels, messages } = useMessages();
+  const { t, labels, messages } = useMessages();
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const { mutateAsync, touch } = useDeleteQuery(`/reports/${id}`);
@@ -64,36 +76,46 @@ export function ReportEditButton({
             <MoreHorizontal />
           </Icon>
         </Button>
-        <Popover placement="bottom">
-          <Menu onAction={handleAction}>
-            <MenuItem id="edit">
+        <Popover side="bottom">
+          <Menu>
+            <MenuItem id="edit" onAction={handleAction}>
               <Icon>
                 <Edit />
               </Icon>
-              <Text>{formatMessage(labels.edit)}</Text>
+              <Text>{t(labels.edit)}</Text>
             </MenuItem>
-            <MenuItem id="delete">
+            <MenuItem id="delete" onAction={handleAction}>
               <Icon>
                 <Trash />
               </Icon>
-              <Text>{formatMessage(labels.delete)}</Text>
+              <Text>{t(labels.delete)}</Text>
             </MenuItem>
           </Menu>
         </Popover>
       </MenuTrigger>
-      <Modal isOpen={showEdit || showDelete} isDismissable={true}>
-        {showEdit && children({ close: handleClose })}
-        {showDelete && (
+      <DialogButton
+        isOpen={showEdit}
+        onOpenChange={open => !open && handleClose()}
+        title={title}
+        width={width}
+        height={height}
+        minWidth={minWidth}
+        minHeight={minHeight}
+      >
+        {children}
+      </DialogButton>
+      <ControlledDialog>
+        <Modal isOpen={showDelete} onOpenChange={open => !open && handleClose()}>
           <AlertDialog
-            title={formatMessage(labels.delete)}
+            title={t(labels.delete)}
             onConfirm={handleDelete}
             onCancel={handleClose}
             isDanger
           >
-            <Row gap="1">{formatMessage(messages.confirmDelete, { target: name })}</Row>
+            <Row gap="1">{t(messages.confirmDelete, { target: name })}</Row>
           </AlertDialog>
-        )}
-      </Modal>
+        </Modal>
+      </ControlledDialog>
     </>
   );
 }
