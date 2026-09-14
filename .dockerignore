@@ -1,7 +1,7 @@
 .git
+.worktrees
 docker-compose.yml
 Dockerfile
-.gitignore
 .DS_Store
 node_modules
 .next
@@ -10,6 +10,7 @@ geo
 generated
 src/generated
 public/script.js
+public/recorder.js
 .idea
 .env
 .env.*

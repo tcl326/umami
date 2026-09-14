@@ -1,18 +1,27 @@
-import { ComboBox, type ComboBoxProps, ListItem, Loading, useDebounce } from '@umami/react-zen';
+import { type ComboBoxProps, ListItem, Loading, useDebounce } from '@umami/react-zen';
 import { endOfDay, subMonths } from 'date-fns';
 import { type SetStateAction, useMemo, useState } from 'react';
+import { ComboBox } from '@/components/common/ComboBox';
 import { Empty } from '@/components/common/Empty';
 import { useMessages, useWebsiteValuesQuery } from '@/components/hooks';
 
-export interface LookupFieldProps extends ComboBoxProps {
+export interface LookupFieldProps extends Omit<ComboBoxProps, 'onChange'> {
   websiteId: string;
   type: string;
   value: string;
   onChange: (value: string) => void;
+  onValueChange?: (value: string) => void;
 }
 
-export function LookupField({ websiteId, type, value, onChange, ...props }: LookupFieldProps) {
-  const { formatMessage, messages } = useMessages();
+export function LookupField({
+  websiteId,
+  type,
+  value,
+  onChange,
+  onValueChange,
+  ...props
+}: LookupFieldProps) {
+  const { t, messages } = useMessages();
   const [search, setSearch] = useState(value);
   const searchValue = useDebounce(search, 300);
   const startDate = subMonths(endOfDay(new Date()), 6);
@@ -40,18 +49,16 @@ export function LookupField({ websiteId, type, value, onChange, ...props }: Look
       {...props}
       items={items}
       inputValue={value}
-      onInputChange={value => {
+      onInputValueChange={value => {
         handleSearch(value);
         onChange?.(value);
+        onValueChange?.(value);
       }}
-      formValue="text"
-      allowsEmptyCollection
-      allowsCustomValue
       renderEmptyState={() =>
         isLoading ? (
           <Loading placement="center" icon="dots" />
         ) : (
-          <Empty message={formatMessage(messages.noResultsFound)} />
+          <Empty message={t(messages.noResultsFound)} />
         )
       }
     >

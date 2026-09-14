@@ -1,7 +1,7 @@
 import { parseRequest } from '@/lib/request';
 import { json, notFound, ok, unauthorized } from '@/lib/response';
 import { reportSchema } from '@/lib/schema';
-import { canDeleteWebsite, canUpdateWebsite, canViewReport } from '@/permissions';
+import { canDeleteReport, canUpdateReport, canViewReport } from '@/permissions';
 import { deleteReport, getReport, updateReport } from '@/queries/prisma';
 
 export async function GET(request: Request, { params }: { params: Promise<{ reportId: string }> }) {
@@ -14,6 +14,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
   const { reportId } = await params;
 
   const report = await getReport(reportId);
+
+  if (!report) {
+    return notFound();
+  }
 
   if (!(await canViewReport(auth, report))) {
     return unauthorized();
@@ -41,13 +45,12 @@ export async function POST(
     return notFound();
   }
 
-  if (!(await canUpdateWebsite(auth, websiteId))) {
+  if (!(await canUpdateReport(auth, report))) {
     return unauthorized();
   }
 
   const result = await updateReport(reportId, {
     websiteId,
-    userId: auth.user.id,
     type,
     name,
     description,
@@ -70,7 +73,11 @@ export async function DELETE(
   const { reportId } = await params;
   const report = await getReport(reportId);
 
-  if (!(await canDeleteWebsite(auth, report.websiteId))) {
+  if (!report) {
+    return notFound();
+  }
+
+  if (!(await canDeleteReport(auth, report))) {
     return unauthorized();
   }
 
